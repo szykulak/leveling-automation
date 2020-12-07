@@ -27,7 +27,7 @@ from material import createMaterialFromDataString
 	
 class ModelCommands2D(object):
 	def __init__(self, roll_diameter, plate_thickness, initial_flatness, mesh_density, upper_rolls_count, lower_rolls_count, distance_between_rolls,
-					  roll_velocity, material_name, calibration_input, calibration_output, friction_coefficient1, friction_coefficient2, material_library):
+					  roll_velocity, material_name, calibration_input, calibration_output, friction_coefficient1, friction_coefficient2, material_library, rolls_right_time_period):
 		self.roll_diameter = roll_diameter 
 		self.plate_thickness = plate_thickness 
 		self.initial_flatness = initial_flatness 
@@ -45,6 +45,7 @@ class ModelCommands2D(object):
 		self.model_name = 'Leveling_D{}G{}_T{}_D{}c_S{}c_F{}_{}'.format(str(self.lower_rolls_count), str(self.upper_rolls_count), 
 		str(self.plate_thickness), str(self.roll_diameter), str(self.distance_between_rolls), str(self.initial_flatness), str(self.material_name).replace(" ","_") )
 		self.material_library = material_library
+		self.rolls_right_time_period = rolls_right_time_period
 	
 	def create_model(self):
 		mdb.Model(name=self.model_name, absoluteZero=0,
@@ -409,8 +410,12 @@ class ModelCommands2D(object):
 			instance_name = 'table-'+str(i+1)
 			a.Instance(name=instance_name, part=p, dependent=ON)
 			s = a.instances[instance_name].edges
-			side2Edges = s.getSequenceFromMask(mask=('[#1 ]', ), )
-			a.Surface(side2Edges=side2Edges, name=instance_name)
+			if i == 0 or i == 2:
+			  side1Edges1 = s.getSequenceFromMask(mask=('[#1 ]', ), )
+			  a.Surface(side1Edges=side1Edges1, name=instance_name)
+			if i == 1 or i == 3:
+			  side2Edges = s.getSequenceFromMask(mask=('[#1 ]', ), )
+			  a.Surface(side2Edges=side2Edges, name=instance_name)
 			
 		table_x1 = (8000.0 + float(self.input_plate_length)/2.0)*(-1)
 		table_x2 = -770
@@ -460,13 +465,20 @@ class ModelCommands2D(object):
 			
 		pass
 	
-	def create_surface_to_surface_contact(self, master_region, slave_region, interaction_name, friction_coefficient):
+	def create_surface_to_surface_contact(self, master_region, slave_region, interaction_name, friction_coefficient, contact_tracking):
 		property_name = self.create_interaction_properties(friction_coefficient)
-		mdb.models[self.model_name].SurfaceToSurfaceContactStd(
-			name=interaction_name, createStepName='Initial', master=master_region, slave=slave_region, 
-			sliding=FINITE, thickness=ON, contactTracking=ONE_CONFIG, 
-			interactionProperty=property_name, adjustMethod=NONE, 
-			initialClearance=OMIT, datumAxis=None, clearanceRegion=None)
+		if contact_tracking == 1:
+			mdb.models[self.model_name].SurfaceToSurfaceContactStd(
+				name=interaction_name, createStepName='Initial', master=master_region, slave=slave_region, 
+				sliding=FINITE, thickness=ON, contactTracking=ONE_CONFIG, 
+				interactionProperty=property_name, adjustMethod=NONE, 
+				initialClearance=OMIT, datumAxis=None, clearanceRegion=None)
+		if contact_tracking == 2:
+			mdb.models[self.model_name].SurfaceToSurfaceContactStd(
+				name=interaction_name, createStepName='Initial', master=master_region, slave=slave_region, 
+				sliding=FINITE, thickness=ON, contactTracking=TWO_CONFIG,
+				interactionProperty=property_name, adjustMethod=NONE, 
+				initialClearance=OMIT, datumAxis=None, clearanceRegion=None)
 
 		pass
 		
@@ -490,7 +502,7 @@ class ModelCommands2D(object):
 			region1=a.instances[instance_name].surfaces['surface'] # master
 			region2=a.surfaces['whole plate'] # slave
 			interaction_name = 'R'+str(i+1)
-			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient) 
+			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient, 1) 
 		
 		# upper roll surf to surf interactions for initial step 
 		for i in range(0, self.lower_rolls_count):
@@ -502,7 +514,7 @@ class ModelCommands2D(object):
 				friction_coefficient = self.friction_coefficient2
 			else: 
 				friction_coefficient = self.friction_coefficient1
-			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient)
+			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient, 1)
 		
 		# upper roll surf to surf interactions for initial step 
 		for i in range(0, self.upper_rolls_count):
@@ -514,7 +526,7 @@ class ModelCommands2D(object):
 				friction_coefficient = self.friction_coefficient2
 			else: 
 				friction_coefficient = self.friction_coefficient1
-			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient)
+			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient, 1)
 		
 		for i in range(0,4):
 			friction_coefficient = self.friction_coefficient1
@@ -522,7 +534,7 @@ class ModelCommands2D(object):
 			region1=a.surfaces[master_surface_name]
 			region2=a.surfaces['whole plate']
 			interaction_name = 'T'+str(i+1)
-			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient) 
+			self.create_surface_to_surface_contact(region1, region2, interaction_name, friction_coefficient, 2) 
 			
 		property = self.create_interaction_properties(self.friction_coefficient1)	
 		mdb.models[self.model_name].ContactStd(name='General', 
@@ -591,8 +603,8 @@ class ModelCommands2D(object):
 	
 	def create_further_steps(self):
 		self.create_static_step('Rolls-down', 'Initial', 10000, 1e-05, 1e-20, 0.05, 1)
-		self.create_static_step('Stabilize', 'Rolls-down', 10000, 0.001, 1e-10, 0.05, 1)
-		self.create_static_step('Rolls-right','Rolls-down', 100000, 1e-05, 1e-10, 1.0, 6.13)
+		self.create_static_step('Stabilize', 'Rolls-down', 10000, 0.001, 1e-10, 0.05, 3)
+		self.create_static_step('Rolls-right','Rolls-down', 100000, 1e-05, 1e-10, 1.0, self.rolls_right_time_period)
 		self.set_gravity_in_step('Rolls-down', -9810.0)
 		
 		pass
@@ -637,7 +649,7 @@ class ModelCommands2D(object):
         stepName='Rolls-down', u2=r2_u2)
 		pass 
 	
-	def set_displacements_and_rotation_values(self): # todo najpierw przeliczyć roll velocity na rad/s 
+	def set_displacements_and_rotation_values(self): 
 		radius = float(self.roll_diameter)/2.0
 		angular_velocity = float(self.roll_velocity)/radius
 		upper_ur3 = -1.0 * angular_velocity 
@@ -673,7 +685,7 @@ class ModelCommands2D(object):
 	
 	def set_field_output_requests(self):
 		mdb.models[self.model_name].fieldOutputRequests['F-Output-1'].setValues(
-        variables=('S', 'PE', 'PEEQ', 'PEMAG', 'LE', 'U', 'RF', 'RM'), 
+        variables=('S', 'PE', 'PEEQ', 'PEMAG', 'LE', 'U', 'RF', 'RM','COORD'), 
         timeInterval=0.2)
 		pass
 	
@@ -701,18 +713,6 @@ class ModelCommands2D(object):
 		pass
 	
 	def read_material_data_from_file(self, material_library):
-			
-		# lib = open("C:\\SIMULIA\\Commands\\abaqus_plugins\\Steel235jrh1.lib", "rb")
-		# material = pickle.load(lib)
-		# for keys in material:
-		#     print(keys, '=>', material[keys])
-		# lib.close()
-		
-		# empt_dict = {} 
-		# path = "C:\\SIMULIA\\Commands\\abaqus_plugins\\material.lib"
-		# original = path
-		# destination = "C:\\SIMULIA\\Commands\\abaqus_plugins\\materialunix.lib" #todo usuwac po dodaniu materialu
-		
 		origin = self.material_library
 		destination = expanduser('~/'+'tmpunix.lib')
 

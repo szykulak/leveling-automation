@@ -34,7 +34,7 @@ class LevellingGUI1_plugin(AFXForm):
         self.calibration_outputKw = AFXFloatKeyword(self.cmd, 'calibration_output', True)
         self.material_nameKw = AFXStringKeyword(self.cmd, 'material_name', True)
 	self.material_libraryKw = AFXStringKeyword(self.cmd, 'material_library', True, '')
-
+	self.rolls_right_time_periodKw = AFXFloatKeyword(self.cmd, 'rolls_right_time_period', True)
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     def getFirstDialog(self):
 
@@ -71,7 +71,7 @@ thisDir = os.path.dirname(thisPath)
 
 toolset = getAFXApp().getAFXMainWindow().getPluginToolset()
 toolset.registerGuiMenuButton(
-    buttonText='Plate levelling', 
+    buttonText='Plate leveling', 
     object=LevellingGUI1_plugin(toolset),
     messageId=AFXMode.ID_ACTIVATE,
     icon=None,

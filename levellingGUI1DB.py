@@ -84,6 +84,7 @@ class LevellingGUI1DB(AFXDataDialog):
         AFXTextField(p=HFrame_2, ncols=12, labelText='Calibration output value:            ', tgt=form.calibration_outputKw, sel=0)
         HFrame_1 = FXHorizontalFrame(p=self, opts=LAYOUT_FILL_X, x=0, y=0, w=0, h=0,
             pl=0, pr=0, pt=0, pb=0)
+	AFXTextField(p=HFrame_1, ncols=12, labelText='Time step [s]:                                      ', tgt=form.rolls_right_time_periodKw, sel=0)
         ComboBox_1 = AFXComboBox(p=HFrame_1, ncols=0, nvis=1, text='Material: ', tgt=form.material_nameKw, sel=0)
         ComboBox_1.setMaxVisible(10)
 	'''
